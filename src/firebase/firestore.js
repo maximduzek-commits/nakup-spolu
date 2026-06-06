@@ -78,6 +78,10 @@ export function subscribeMasterItems(cb) {
   })
 }
 
+export async function deleteMasterItem(id) {
+  await deleteDoc(doc(db, 'household', HOUSEHOLD_ID, 'masterItems', id))
+}
+
 export async function addMasterItem(item) {
   return await addDoc(masterItemsRef(), {
     name: item.name,

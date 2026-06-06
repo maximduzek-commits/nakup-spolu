@@ -18,15 +18,20 @@ export default function SeznamyScreen({ syncStatus, setSyncStatus }) {
   const [expanded, setExpanded] = useState({})
 
   async function handleAddAll(list) {
-    setSyncStatus('syncing')
-    for (const name of list.itemNames) {
-      const master = SEED_ITEMS.find(i => i.name === name)
-      const category = master?.category ?? 'Trvanlivé potraviny'
-      await addItemToList({ name, category, qty: 1 })
+    try {
+      setSyncStatus('syncing')
+      for (const name of list.itemNames) {
+        const master = SEED_ITEMS.find(i => i.name === name)
+        const category = master?.category ?? 'Trvanlivé potraviny'
+        await addItemToList({ name, category, qty: 1 })
+      }
+      setSyncStatus('online')
+      setAdded(prev => ({ ...prev, [list.id]: true }))
+      setTimeout(() => setAdded(prev => ({ ...prev, [list.id]: false })), 3000)
+    } catch (e) {
+      setSyncStatus('offline')
+      alert('Chyba: ' + e.message)
     }
-    setSyncStatus('online')
-    setAdded(prev => ({ ...prev, [list.id]: true }))
-    setTimeout(() => setAdded(prev => ({ ...prev, [list.id]: false })), 3000)
   }
 
   async function handleDelete(list) {
