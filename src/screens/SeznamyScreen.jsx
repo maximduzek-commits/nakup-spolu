@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useSavedLists } from '../hooks/useFirestore'
-import { addItemToList, deleteSavedList } from '../firebase/firestore'
-import { SEED_ITEMS } from '../data/seedData'
+import { useSavedLists, useMasterItems } from '../hooks/useFirestore'
+import { addItemToList, deleteSavedList, createSavedList } from '../firebase/firestore'
+import { SEED_ITEMS, CATEGORIES } from '../data/seedData'
 import SyncBadge from '../components/SyncBadge'
+
+const EMOJIS = ['📝','🔥','☀️','🥗','🎉','🧺','👶','💊','🏠','🌿','🍕','🎯']
 
 function TrashIcon() {
   return (
@@ -12,10 +14,119 @@ function TrashIcon() {
   )
 }
 
+function CreatePanel({ masterItems, onSave, onCancel }) {
+  const [name, setName] = useState('')
+  const [emoji, setEmoji] = useState('📝')
+  const [selected, setSelected] = useState(new Set())
+  const [search, setSearch] = useState('')
+
+  function toggle(itemName) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(itemName) ? next.delete(itemName) : next.add(itemName)
+      return next
+    })
+  }
+
+  const filtered = search.trim()
+    ? masterItems.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    : masterItems
+
+  const grouped = CATEGORIES.map(cat => ({
+    ...cat,
+    items: filtered.filter(i => i.category === cat.name),
+  })).filter(g => g.items.length > 0)
+
+  return (
+    <div className="create-panel">
+      <div className="create-panel-header">
+        <span style={{ fontFamily: 'Fraunces, serif', fontSize: 18, fontWeight: 600 }}>Nový seznam</span>
+        <button className="create-panel-close" onClick={onCancel}>Zrušit</button>
+      </div>
+
+      <div className="create-panel-name-row">
+        <div className="emoji-picker">
+          {EMOJIS.map(e => (
+            <button
+              key={e}
+              className={`emoji-btn${emoji === e ? ' selected' : ''}`}
+              onClick={() => setEmoji(e)}
+            >{e}</button>
+          ))}
+        </div>
+        <input
+          className="create-name-input"
+          placeholder="Název seznamu…"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          autoFocus
+        />
+      </div>
+
+      <div className="create-search-bar">
+        <div className="search-input-wrap" style={{ background: 'var(--cream)' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" style={{ width: 15, height: 15, color: 'var(--text-muted)', flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="text"
+            placeholder="Hledat položky…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {selected.size > 0 && (
+        <div className="selected-count">{selected.size} položek vybráno</div>
+      )}
+
+      <div className="create-items-scroll">
+        {grouped.map(cat => (
+          <div key={cat.name}>
+            <div className="create-cat-header">
+              <span>{cat.emoji}</span>
+              <span>{cat.name}</span>
+            </div>
+            {cat.items.map(item => (
+              <div
+                key={item.id}
+                className={`create-item${selected.has(item.name) ? ' selected' : ''}`}
+                onClick={() => toggle(item.name)}
+              >
+                <div className={`create-item-check${selected.has(item.name) ? ' checked' : ''}`}>
+                  {selected.has(item.name) && (
+                    <svg width="11" height="8" viewBox="0 0 12 9" fill="none">
+                      <path d="M1 4L4.5 7.5L11 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+                <span className="create-item-name">{item.name}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="create-panel-footer">
+        <button
+          className="create-save-btn"
+          disabled={!name.trim() || selected.size === 0}
+          onClick={() => onSave(name.trim(), emoji, [...selected])}
+        >
+          Uložit seznam · {selected.size} položek
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function SeznamyScreen({ syncStatus, setSyncStatus }) {
   const lists = useSavedLists()
+  const { items: masterItems } = useMasterItems()
   const [added, setAdded] = useState({})
   const [expanded, setExpanded] = useState({})
+  const [creating, setCreating] = useState(false)
 
   async function handleAddAll(list) {
     try {
@@ -39,12 +150,24 @@ export default function SeznamyScreen({ syncStatus, setSyncStatus }) {
     await deleteSavedList(list.id)
   }
 
+  async function handleCreate(name, emoji, itemNames) {
+    try {
+      setSyncStatus('syncing')
+      await createSavedList(name, emoji, itemNames)
+      setSyncStatus('online')
+      setCreating(false)
+    } catch (e) {
+      setSyncStatus('offline')
+      alert('Chyba: ' + e.message)
+    }
+  }
+
   function toggleExpand(id) {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
   return (
-    <div className="screen-wrap">
+    <div className="screen-wrap" style={{ position: 'relative' }}>
       <div className="app-header">
         <div className="header-row">
           <div className="app-title">Moje seznamy</div>
@@ -54,7 +177,7 @@ export default function SeznamyScreen({ syncStatus, setSyncStatus }) {
 
       <div className="scroll-area">
         <div className="zoznamy-cards">
-          <button className="create-zoznam-btn">
+          <button className="create-zoznam-btn" onClick={() => setCreating(true)}>
             <div className="create-zoznam-icon">+</div>
             <span className="create-zoznam-text">Vytvořit nový seznam</span>
           </button>
@@ -68,10 +191,7 @@ export default function SeznamyScreen({ syncStatus, setSyncStatus }) {
                   <div className="zoznam-count">{list.itemNames?.length ?? 0} položek</div>
                 </div>
                 <div className="zoznam-actions">
-                  <button
-                    className="zoznam-edit-btn"
-                    onClick={() => toggleExpand(list.id)}
-                  >
+                  <button className="zoznam-edit-btn" onClick={() => toggleExpand(list.id)}>
                     {expanded[list.id] ? 'Zavřít' : 'Upravit'}
                   </button>
                 </div>
@@ -120,6 +240,16 @@ export default function SeznamyScreen({ syncStatus, setSyncStatus }) {
           )}
         </div>
       </div>
+
+      {creating && (
+        <div className="create-overlay">
+          <CreatePanel
+            masterItems={masterItems}
+            onSave={handleCreate}
+            onCancel={() => setCreating(false)}
+          />
+        </div>
+      )}
     </div>
   )
 }
