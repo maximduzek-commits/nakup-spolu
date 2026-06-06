@@ -754,9 +754,40 @@ html, body, #root {
 
 .create-item-name {
   font-size: 15px; font-weight: 500; color: var(--text);
+  flex: 1; min-width: 0;
 }
 
 .create-item.selected .create-item-name { color: var(--green-mid); }
+
+.create-item-qty {
+  display: flex;
+  align-items: center;
+  background: var(--green);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  height: 30px;
+}
+
+.create-qty-btn {
+  width: 28px; height: 30px;
+  background: none; border: none;
+  color: white; font-size: 17px; font-weight: 400;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  transition: background .1s;
+}
+
+.create-qty-btn:active { background: rgba(255,255,255,.25); }
+
+.create-qty-num {
+  min-width: 22px; text-align: center;
+  font-size: 14px; font-weight: 700;
+  color: white;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  pointer-events: none;
+}
 
 .create-panel-footer {
   padding: 12px 16px;

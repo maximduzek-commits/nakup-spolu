@@ -17,13 +17,22 @@ function TrashIcon() {
 function CreatePanel({ masterItems, onSave, onCancel }) {
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('📝')
-  const [selected, setSelected] = useState(new Set())
+  const [selected, setSelected] = useState(new Map()) // name → qty
   const [search, setSearch] = useState('')
 
   function toggle(itemName) {
     setSelected(prev => {
-      const next = new Set(prev)
-      next.has(itemName) ? next.delete(itemName) : next.add(itemName)
+      const next = new Map(prev)
+      next.has(itemName) ? next.delete(itemName) : next.set(itemName, 1)
+      return next
+    })
+  }
+
+  function changeQty(itemName, delta) {
+    setSelected(prev => {
+      const next = new Map(prev)
+      const qty = Math.max(1, (next.get(itemName) ?? 1) + delta)
+      next.set(itemName, qty)
       return next
     })
   }
@@ -36,6 +45,8 @@ function CreatePanel({ masterItems, onSave, onCancel }) {
     ...cat,
     items: filtered.filter(i => i.category === cat.name),
   })).filter(g => g.items.length > 0)
+
+  const items = [...selected.entries()].map(([name, qty]) => ({ name, qty }))
 
   return (
     <div className="create-panel">
@@ -88,22 +99,33 @@ function CreatePanel({ masterItems, onSave, onCancel }) {
               <span>{cat.emoji}</span>
               <span>{cat.name}</span>
             </div>
-            {cat.items.map(item => (
-              <div
-                key={item.id}
-                className={`create-item${selected.has(item.name) ? ' selected' : ''}`}
-                onClick={() => toggle(item.name)}
-              >
-                <div className={`create-item-check${selected.has(item.name) ? ' checked' : ''}`}>
-                  {selected.has(item.name) && (
-                    <svg width="11" height="8" viewBox="0 0 12 9" fill="none">
-                      <path d="M1 4L4.5 7.5L11 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
+            {cat.items.map(item => {
+              const isSelected = selected.has(item.name)
+              const qty = selected.get(item.name) ?? 1
+              return (
+                <div
+                  key={item.id}
+                  className={`create-item${isSelected ? ' selected' : ''}`}
+                  onClick={() => toggle(item.name)}
+                >
+                  <div className={`create-item-check${isSelected ? ' checked' : ''}`}>
+                    {isSelected && (
+                      <svg width="11" height="8" viewBox="0 0 12 9" fill="none">
+                        <path d="M1 4L4.5 7.5L11 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </div>
+                  <span className="create-item-name">{item.name}</span>
+                  {isSelected && (
+                    <div className="create-item-qty" onClick={e => e.stopPropagation()}>
+                      <button className="create-qty-btn" onClick={() => changeQty(item.name, -1)}>−</button>
+                      <span className="create-qty-num">{qty}</span>
+                      <button className="create-qty-btn" onClick={() => changeQty(item.name, 1)}>+</button>
+                    </div>
                   )}
                 </div>
-                <span className="create-item-name">{item.name}</span>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ))}
       </div>
@@ -112,7 +134,7 @@ function CreatePanel({ masterItems, onSave, onCancel }) {
         <button
           className="create-save-btn"
           disabled={!name.trim() || selected.size === 0}
-          onClick={() => onSave(name.trim(), emoji, [...selected])}
+          onClick={() => onSave(name.trim(), emoji, items)}
         >
           Uložit seznam · {selected.size} položek
         </button>
@@ -131,10 +153,12 @@ export default function SeznamyScreen({ syncStatus, setSyncStatus }) {
   async function handleAddAll(list) {
     try {
       setSyncStatus('syncing')
-      for (const name of list.itemNames) {
+      for (const item of (list.itemNames ?? [])) {
+        const name = typeof item === 'string' ? item : item.name
+        const qty  = typeof item === 'string' ? 1   : (item.qty ?? 1)
         const master = SEED_ITEMS.find(i => i.name === name)
         const category = master?.category ?? 'Trvanlivé potraviny'
-        await addItemToList({ name, category, qty: 1 })
+        await addItemToList({ name, category, qty })
       }
       setSyncStatus('online')
       setAdded(prev => ({ ...prev, [list.id]: true }))
