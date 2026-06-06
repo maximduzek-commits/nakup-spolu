@@ -614,6 +614,72 @@ html, body, #root {
 .empty-title { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
 .empty-sub { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
 
+/* ── RENAME OVERLAY ── */
+.rename-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+}
+
+.rename-sheet {
+  background: var(--white);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  padding: 24px 20px 36px;
+  width: 100%;
+}
+
+.rename-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.rename-input {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1.5px solid var(--green);
+  border-radius: var(--r-md);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 16px; font-weight: 500;
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+  margin-bottom: 14px;
+}
+
+.rename-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.rename-cancel {
+  flex: 1; height: 48px;
+  background: var(--cream); border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 15px; font-weight: 600; color: var(--text-muted);
+  cursor: pointer;
+}
+
+.rename-save {
+  flex: 2; height: 48px;
+  background: var(--green); border: none;
+  border-radius: var(--r-md);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 15px; font-weight: 700; color: white;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(28,74,46,.25);
+}
+
+.rename-save:disabled { opacity: .4; cursor: default; box-shadow: none; }
+.rename-save:not(:disabled):active { transform: scale(.97); }
+
 /* ── CREATE LIST OVERLAY ── */
 .create-overlay {
   position: absolute;

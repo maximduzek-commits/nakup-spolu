@@ -82,6 +82,17 @@ export async function deleteMasterItem(id) {
   await deleteDoc(doc(db, 'household', HOUSEHOLD_ID, 'masterItems', id))
 }
 
+export async function renameMasterItem(id, oldName, newName) {
+  await updateDoc(doc(db, 'household', HOUSEHOLD_ID, 'masterItems', id), { name: newName })
+  // also rename in current list if present
+  const listSnap = await getDoc(currentListRef())
+  const items = listSnap.data()?.items ?? []
+  const updated = items.map(i => i.name === oldName ? { ...i, name: newName } : i)
+  if (items.some(i => i.name === oldName)) {
+    await setDoc(currentListRef(), { items: updated })
+  }
+}
+
 export async function addMasterItem(item) {
   return await addDoc(masterItemsRef(), {
     name: item.name,

@@ -1,8 +1,10 @@
 import { useState, useMemo, useRef } from 'react'
 import { useMasterItems, useCurrentList } from '../hooks/useFirestore'
-import { addItemToList, removeItemFromList, addMasterItem, updateListItem, deleteMasterItem } from '../firebase/firestore'
+import { addItemToList, removeItemFromList, addMasterItem, updateListItem, deleteMasterItem, renameMasterItem } from '../firebase/firestore'
 import { CATEGORIES } from '../data/seedData'
 import SyncBadge from '../components/SyncBadge'
+
+const LONG_PRESS_MS = 550
 
 function TrashIcon() {
   return (
@@ -12,9 +14,75 @@ function TrashIcon() {
   )
 }
 
-function MasterItem({ item, inList, qty, onToggle, onQty, editMode, onDelete }) {
+function RenameOverlay({ item, onSave, onCancel }) {
+  const [value, setValue] = useState(item.name)
+  const inputRef = useRef(null)
+
+  // auto-focus
+  useState(() => { setTimeout(() => inputRef.current?.focus(), 50) })
+
   return (
-    <div className={`master-item${inList ? ' in-list' : ''}${editMode ? ' edit-mode' : ''}`} onClick={!editMode ? onToggle : undefined}>
+    <div className="rename-backdrop" onClick={onCancel}>
+      <div className="rename-sheet" onClick={e => e.stopPropagation()}>
+        <div className="rename-title">Přejmenovat položku</div>
+        <input
+          ref={inputRef}
+          className="rename-input"
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && value.trim() && onSave(value.trim())}
+          autoFocus
+        />
+        <div className="rename-actions">
+          <button className="rename-cancel" onClick={onCancel}>Zrušit</button>
+          <button
+            className="rename-save"
+            disabled={!value.trim() || value.trim() === item.name}
+            onClick={() => onSave(value.trim())}
+          >
+            Uložit
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MasterItem({ item, inList, qty, onToggle, onQty, editMode, onDelete, onLongPress }) {
+  const timerRef = useRef(null)
+  const didLongPress = useRef(false)
+
+  function startPress() {
+    didLongPress.current = false
+    timerRef.current = setTimeout(() => {
+      didLongPress.current = true
+      onLongPress()
+    }, LONG_PRESS_MS)
+  }
+
+  function cancelPress() {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
+  function handleClick() {
+    if (didLongPress.current || editMode) return
+    onToggle()
+  }
+
+  return (
+    <div
+      className={`master-item${inList ? ' in-list' : ''}${editMode ? ' edit-mode' : ''}`}
+      onMouseDown={startPress}
+      onMouseUp={cancelPress}
+      onMouseLeave={cancelPress}
+      onTouchStart={startPress}
+      onTouchEnd={cancelPress}
+      onTouchMove={cancelPress}
+      onClick={handleClick}
+    >
       {editMode && (
         <button className="master-delete-btn" onClick={e => { e.stopPropagation(); onDelete() }}>
           <TrashIcon />
@@ -39,6 +107,7 @@ export default function PridatScreen({ syncStatus, setSyncStatus }) {
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
+  const [renamingItem, setRenamingItem] = useState(null)
   const searchRef = useRef(null)
 
   const listMap = useMemo(() => {
@@ -63,36 +132,50 @@ export default function PridatScreen({ syncStatus, setSyncStatus }) {
     }
   }
 
-  async function handleDelete(item) {
-    if (!confirm(`Smazat „${item.name}" z katalogu?`)) return
-    try {
-      await deleteMasterItem(item.id)
-      await removeItemFromList(listMap[item.name]?.id)
-    } catch (e) {
-      setError('Chyba při mazání: ' + e.message)
-    }
-  }
-
   async function handleQty(masterItem, delta) {
     const listItem = listMap[masterItem.name]
     if (!listItem) return
-    const newQty = Math.max(1, (listItem.qty ?? 1) + delta)
+    const newQty = (listItem.qty ?? 1) + delta
     try {
       setSyncStatus('syncing')
-      await updateListItem(listItem.id, { qty: newQty })
+      if (newQty <= 0) {
+        await removeItemFromList(listItem.id)
+      } else {
+        await updateListItem(listItem.id, { qty: newQty })
+      }
       setSyncStatus('online')
     } catch (e) {
       setSyncStatus('offline')
     }
   }
 
+  async function handleDelete(item) {
+    if (!confirm(`Smazat „${item.name}" z katalogu?`)) return
+    try {
+      await deleteMasterItem(item.id)
+      if (listMap[item.name]) await removeItemFromList(listMap[item.name].id)
+    } catch (e) {
+      setError('Chyba při mazání: ' + e.message)
+    }
+  }
+
+  async function handleRename(newName) {
+    if (!renamingItem) return
+    try {
+      setSyncStatus('syncing')
+      await renameMasterItem(renamingItem.id, renamingItem.name, newName)
+      setSyncStatus('online')
+    } catch (e) {
+      setSyncStatus('offline')
+      setError('Chyba při přejmenování: ' + e.message)
+    } finally {
+      setRenamingItem(null)
+    }
+  }
+
   async function handleAddCustom() {
     const name = search.trim()
-    if (!name) {
-      // focus search so user can type
-      searchRef.current?.focus()
-      return
-    }
+    if (!name) { searchRef.current?.focus(); return }
     setError('')
     try {
       setSyncStatus('syncing')
@@ -193,6 +276,14 @@ export default function PridatScreen({ syncStatus, setSyncStatus }) {
           </div>
         )}
 
+        {!editMode && (
+          <div style={{ padding: '2px 20px 8px' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>
+              Podržte položku pro přejmenování
+            </span>
+          </div>
+        )}
+
         {grouped.map(cat => (
           <div key={cat.name} className="category-section">
             <div className="category-header">
@@ -210,12 +301,21 @@ export default function PridatScreen({ syncStatus, setSyncStatus }) {
                   onQty={delta => handleQty(item, delta)}
                   editMode={editMode}
                   onDelete={() => handleDelete(item)}
+                  onLongPress={() => setRenamingItem(item)}
                 />
               ))}
             </div>
           </div>
         ))}
       </div>
+
+      {renamingItem && (
+        <RenameOverlay
+          item={renamingItem}
+          onSave={handleRename}
+          onCancel={() => setRenamingItem(null)}
+        />
+      )}
     </div>
   )
 }
