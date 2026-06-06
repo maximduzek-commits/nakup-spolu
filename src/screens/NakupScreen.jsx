@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useCurrentList, useMasterItems } from '../hooks/useFirestore'
 import { removeItemFromList, updateListItem, completeShoppingList, addItemToList } from '../firebase/firestore'
 import { CATEGORIES } from '../data/seedData'
@@ -12,31 +12,88 @@ function CheckIcon() {
   )
 }
 
-function ListItem({ item, onCheck, onRemove, onQty }) {
-  const [removing, setRemoving] = useState(false)
+const SWIPE_THRESHOLD = 72
 
-  function handleCheck() {
-    if (removing) return
-    setRemoving(true)
+function ListItem({ item, onCheck, onRemove, onQty }) {
+  const [gone, setGone] = useState(false)
+  const [swipeX, setSwipeX] = useState(0)
+  const [swiping, setSwiping] = useState(false)
+  const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
+  const didSwipe = useRef(false)
+
+  function dismiss() {
+    if (gone) return
+    setGone(true)
+    onRemove(item.id)
+  }
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+    didSwipe.current = false
+  }
+
+  function handleTouchMove(e) {
+    if (touchStartX.current === null) return
+    const dx = e.touches[0].clientX - touchStartX.current
+    const dy = Math.abs(e.touches[0].clientY - touchStartY.current)
+    // only swipe right, and only if mostly horizontal
+    if (dx > 8 && dy < 30) {
+      e.preventDefault()
+      setSwiping(true)
+      setSwipeX(Math.min(dx, SWIPE_THRESHOLD + 20))
+      if (dx > SWIPE_THRESHOLD) didSwipe.current = true
+    }
+  }
+
+  function handleTouchEnd() {
+    if (didSwipe.current) {
+      dismiss()
+    } else {
+      setSwipeX(0)
+      setSwiping(false)
+    }
+    touchStartX.current = null
+    touchStartY.current = null
+  }
+
+  function handleClick() {
+    if (swiping || gone) return
+    setGone(true)
     onCheck(item.id)
   }
 
+  const progress = Math.min(swipeX / SWIPE_THRESHOLD, 1)
+
   return (
-    <div className={`list-item${removing ? ' removing' : ''}`} onClick={handleCheck}>
-      <div className={`checkbox${removing ? ' checked' : ''}`}>
-        {removing && <CheckIcon />}
-      </div>
-      <span className="item-name">{item.name}</span>
-      <div className="qty-control" onClick={e => e.stopPropagation()}>
-        <button className="qty-btn minus" onClick={() => onQty(item.id, -1)}>−</button>
-        <span className="qty-num">{item.qty ?? 1}</span>
-        <button className="qty-btn" onClick={() => onQty(item.id, 1)}>+</button>
-      </div>
-      <button className="item-remove" onClick={e => { e.stopPropagation(); onRemove(item.id) }}>
-        <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-          <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+    <div
+      className={`list-item-wrap${gone ? ' gone' : ''}`}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* swipe hint behind item */}
+      <div className="swipe-hint" style={{ opacity: progress }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
         </svg>
-      </button>
+      </div>
+      <div
+        className={`list-item${gone ? ' removing' : ''}`}
+        style={{ transform: `translateX(${swipeX}px)`, transition: swiping ? 'none' : 'transform .25s ease' }}
+        onClick={handleClick}
+      >
+        <div className={`checkbox${gone ? ' checked' : ''}`}>
+          {gone && <CheckIcon />}
+        </div>
+        <span className="item-name">{item.name}</span>
+        <div className="qty-control" onClick={e => e.stopPropagation()}>
+          <button className="qty-btn minus" onClick={() => onQty(item.id, -1)}>−</button>
+          <span className="qty-num">{item.qty ?? 1}</span>
+          <button className="qty-btn" onClick={() => onQty(item.id, 1)}>+</button>
+        </div>
+      </div>
     </div>
   )
 }

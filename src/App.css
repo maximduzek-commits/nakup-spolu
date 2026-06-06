@@ -183,6 +183,33 @@ html, body, #root {
   gap: 3px;
 }
 
+.list-item-wrap {
+  position: relative;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.list-item-wrap.gone {
+  animation: collapseItem .3s ease forwards;
+  animation-delay: .15s;
+  pointer-events: none;
+}
+
+@keyframes collapseItem {
+  to { max-height: 0; opacity: 0; margin-bottom: -3px; }
+}
+
+.swipe-hint {
+  position: absolute;
+  inset: 0;
+  background: #EF4444;
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  padding-left: 20px;
+  pointer-events: none;
+}
+
 .list-item {
   display: flex;
   align-items: center;
@@ -224,18 +251,6 @@ html, body, #root {
   min-width: 0;
 }
 
-.item-remove {
-  width: 28px; height: 28px;
-  border-radius: 8px;
-  background: none; border: none;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  color: var(--text-muted);
-  flex-shrink: 0;
-  opacity: 0;
-  transition: opacity .15s;
-}
-.list-item:hover .item-remove { opacity: 1; }
 
 /* ── QTY CONTROL (nakup) ── */
 .qty-control {
