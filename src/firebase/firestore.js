@@ -1,6 +1,6 @@
 import {
   doc, collection, onSnapshot, setDoc, updateDoc, getDoc,
-  deleteDoc, addDoc, getDocs, serverTimestamp, query, orderBy, limit
+  deleteDoc, addDoc, getDocs, serverTimestamp, query, orderBy, limit, writeBatch
 } from 'firebase/firestore'
 import { db } from './config'
 
@@ -18,15 +18,13 @@ export function subscribeCurrentList(cb) {
 }
 
 export async function addItemToList(item) {
-  const snap = await getDocs(query(masterItemsRef()))
-  const existing = snap.docs.find(d => d.data().name === item.name)
-  if (existing) {
-    await updateDoc(existing.ref, { lastPurchased: null })
-  }
   const listSnap = await getDoc(currentListRef())
   const items = listSnap.exists() ? (listSnap.data().items ?? []) : []
-  if (items.find(i => i.id === item.id)) return
-  await setDoc(currentListRef(), { items: [...items, { ...item, addedAt: Date.now() }] }, { merge: true })
+  // prevent duplicate by name
+  if (items.find(i => i.name === item.name)) return
+  await setDoc(currentListRef(), {
+    items: [...items, { ...item, id: item.id ?? crypto.randomUUID(), addedAt: Date.now() }]
+  })
 }
 
 export async function removeItemFromList(itemId) {
@@ -44,25 +42,32 @@ export async function updateListItem(itemId, changes) {
 export async function completeShoppingList() {
   const snap = await getDoc(currentListRef())
   const items = snap.data()?.items ?? []
+  if (items.length === 0) return
+
   // save to history
   await addDoc(historyRef(), {
     items,
     completedAt: serverTimestamp(),
     itemCount: items.length,
   })
-  // update masterItems purchaseCount + lastPurchased
+
+  // update masterItems purchaseCount + lastPurchased (single getDocs call)
+  const masterSnap = await getDocs(masterItemsRef())
+  const masterMap = {}
+  masterSnap.docs.forEach(d => { masterMap[d.data().name] = d })
+
+  const batch = writeBatch(db)
   for (const item of items) {
-    const masterSnap = await getDocs(masterItemsRef())
-    const masterDoc = masterSnap.docs.find(d => d.data().name === item.name)
+    const masterDoc = masterMap[item.name]
     if (masterDoc) {
-      const data = masterDoc.data()
-      await updateDoc(masterDoc.ref, {
-        purchaseCount: (data.purchaseCount ?? 0) + 1,
+      batch.update(masterDoc.ref, {
+        purchaseCount: (masterDoc.data().purchaseCount ?? 0) + 1,
         lastPurchased: serverTimestamp(),
       })
     }
   }
-  // clear current list
+  await batch.commit()
+
   await setDoc(currentListRef(), { items: [] })
 }
 
@@ -74,7 +79,7 @@ export function subscribeMasterItems(cb) {
 }
 
 export async function addMasterItem(item) {
-  await addDoc(masterItemsRef(), {
+  return await addDoc(masterItemsRef(), {
     name: item.name,
     category: item.category,
     purchaseCount: 0,
@@ -108,15 +113,16 @@ export async function deleteSavedList(id) {
 
 // ── Seed master items (run once) ──
 export async function seedMasterItems(items) {
-  const existing = await getDocs(masterItemsRef())
-  if (existing.size > 0) return
-  for (const item of items) {
-    await addDoc(masterItemsRef(), {
-      ...item,
-      purchaseCount: 0,
-      lastPurchased: null,
-      createdAt: serverTimestamp(),
+  try {
+    const existing = await getDocs(masterItemsRef())
+    if (existing.size > 0) return
+    const batch = writeBatch(db)
+    items.forEach(item => {
+      const ref = doc(masterItemsRef())
+      batch.set(ref, { ...item, purchaseCount: 0, lastPurchased: null, createdAt: serverTimestamp() })
     })
+    await batch.commit()
+  } catch (e) {
+    console.error('Seed failed:', e)
   }
 }
-
