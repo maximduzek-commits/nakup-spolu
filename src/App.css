@@ -680,6 +680,42 @@ html, body, #root {
 .rename-save:disabled { opacity: .4; cursor: default; box-shadow: none; }
 .rename-save:not(:disabled):active { transform: scale(.97); }
 
+.cat-picker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.cat-picker-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--cream);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: all .15s;
+  text-align: left;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.cat-picker-btn:active {
+  background: var(--green-pale);
+  border-color: var(--green-light);
+  transform: scale(.97);
+}
+
+.cat-picker-emoji { font-size: 20px; flex-shrink: 0; }
+
+.cat-picker-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+
 /* ── CREATE LIST OVERLAY ── */
 .create-overlay {
   position: absolute;

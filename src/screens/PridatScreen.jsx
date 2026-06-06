@@ -14,6 +14,27 @@ function TrashIcon() {
   )
 }
 
+function CategoryPicker({ name, onSelect, onCancel }) {
+  return (
+    <div className="rename-backdrop" onClick={onCancel}>
+      <div className="rename-sheet" onClick={e => e.stopPropagation()}>
+        <div className="rename-title">Kategorie pro „{name}"</div>
+        <div className="cat-picker-grid">
+          {CATEGORIES.map(cat => (
+            <button key={cat.name} className="cat-picker-btn" onClick={() => onSelect(cat.name)}>
+              <span className="cat-picker-emoji">{cat.emoji}</span>
+              <span className="cat-picker-name">{cat.name}</span>
+            </button>
+          ))}
+        </div>
+        <button className="rename-cancel" style={{ width: '100%', marginTop: 10 }} onClick={onCancel}>
+          Zrušit
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function RenameOverlay({ item, onSave, onCancel }) {
   const [value, setValue] = useState(item.name)
   const inputRef = useRef(null)
@@ -108,6 +129,7 @@ export default function PridatScreen({ syncStatus, setSyncStatus }) {
   const [error, setError] = useState('')
   const [editMode, setEditMode] = useState(false)
   const [renamingItem, setRenamingItem] = useState(null)
+  const [pendingAdd, setPendingAdd] = useState(null)
   const searchRef = useRef(null)
 
   const listMap = useMemo(() => {
@@ -176,11 +198,17 @@ export default function PridatScreen({ syncStatus, setSyncStatus }) {
   async function handleAddCustom() {
     const name = search.trim()
     if (!name) { searchRef.current?.focus(); return }
+    setPendingAdd(name)
+  }
+
+  async function handleAddWithCategory(category) {
+    const name = pendingAdd
+    setPendingAdd(null)
     setError('')
     try {
       setSyncStatus('syncing')
-      const ref = await addMasterItem({ name, category: 'Trvanlivé potraviny' })
-      await addItemToList({ id: ref.id, name, category: 'Trvanlivé potraviny', qty: 1 })
+      const ref = await addMasterItem({ name, category })
+      await addItemToList({ id: ref.id, name, category, qty: 1 })
       setSearch('')
       setSyncStatus('online')
     } catch (e) {
@@ -314,6 +342,14 @@ export default function PridatScreen({ syncStatus, setSyncStatus }) {
           item={renamingItem}
           onSave={handleRename}
           onCancel={() => setRenamingItem(null)}
+        />
+      )}
+
+      {pendingAdd && (
+        <CategoryPicker
+          name={pendingAdd}
+          onSelect={handleAddWithCategory}
+          onCancel={() => setPendingAdd(null)}
         />
       )}
     </div>
