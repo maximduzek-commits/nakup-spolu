@@ -1,6 +1,7 @@
 import {
   doc, collection, onSnapshot, setDoc, updateDoc, getDoc,
-  deleteDoc, addDoc, getDocs, serverTimestamp, query, orderBy, limit, writeBatch
+  deleteDoc, addDoc, getDocs, serverTimestamp, query, orderBy, limit,
+  writeBatch, runTransaction
 } from 'firebase/firestore'
 import { db } from './config'
 
@@ -17,26 +18,33 @@ export function subscribeCurrentList(cb) {
   })
 }
 
+// BUG #1 FIX: transakce zabraňuje race condition při souběžných zápisech
 export async function addItemToList(item) {
-  const listSnap = await getDoc(currentListRef())
-  const items = listSnap.exists() ? (listSnap.data().items ?? []) : []
-  // prevent duplicate by name
-  if (items.find(i => i.name === item.name)) return
-  await setDoc(currentListRef(), {
-    items: [...items, { ...item, id: item.id ?? crypto.randomUUID(), addedAt: Date.now() }]
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(currentListRef())
+    const items = snap.exists() ? (snap.data().items ?? []) : []
+    if (items.find(i => i.name === item.name)) return
+    tx.set(currentListRef(), {
+      items: [...items, { ...item, id: item.id ?? crypto.randomUUID(), addedAt: Date.now() }]
+    })
   })
 }
 
 export async function removeItemFromList(itemId) {
-  const snap = await getDoc(currentListRef())
-  const items = (snap.data()?.items ?? []).filter(i => i.id !== itemId)
-  await setDoc(currentListRef(), { items })
+  if (!itemId) return
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(currentListRef())
+    const items = (snap.data()?.items ?? []).filter(i => i.id !== itemId)
+    tx.set(currentListRef(), { items })
+  })
 }
 
 export async function updateListItem(itemId, changes) {
-  const snap = await getDoc(currentListRef())
-  const items = (snap.data()?.items ?? []).map(i => i.id === itemId ? { ...i, ...changes } : i)
-  await setDoc(currentListRef(), { items })
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(currentListRef())
+    const items = (snap.data()?.items ?? []).map(i => i.id === itemId ? { ...i, ...changes } : i)
+    tx.set(currentListRef(), { items })
+  })
 }
 
 export async function completeShoppingList() {
@@ -44,14 +52,12 @@ export async function completeShoppingList() {
   const items = snap.data()?.items ?? []
   if (items.length === 0) return
 
-  // save to history
   await addDoc(historyRef(), {
     items,
     completedAt: serverTimestamp(),
     itemCount: items.length,
   })
 
-  // update masterItems purchaseCount + lastPurchased (single getDocs call)
   const masterSnap = await getDocs(masterItemsRef())
   const masterMap = {}
   masterSnap.docs.forEach(d => { masterMap[d.data().name] = d })
@@ -82,15 +88,37 @@ export async function deleteMasterItem(id) {
   await deleteDoc(doc(db, 'household', HOUSEHOLD_ID, 'masterItems', id))
 }
 
+// BUG #5 FIX: rename aktualizuje i savedLists reference
 export async function renameMasterItem(id, oldName, newName) {
   await updateDoc(doc(db, 'household', HOUSEHOLD_ID, 'masterItems', id), { name: newName })
-  // also rename in current list if present
-  const listSnap = await getDoc(currentListRef())
-  const items = listSnap.data()?.items ?? []
-  const updated = items.map(i => i.name === oldName ? { ...i, name: newName } : i)
-  if (items.some(i => i.name === oldName)) {
-    await setDoc(currentListRef(), { items: updated })
-  }
+
+  // aktualizuj current list
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(currentListRef())
+    const items = snap.data()?.items ?? []
+    if (items.some(i => i.name === oldName)) {
+      tx.set(currentListRef(), {
+        items: items.map(i => i.name === oldName ? { ...i, name: newName } : i)
+      })
+    }
+  })
+
+  // aktualizuj savedLists
+  const savedSnap = await getDocs(savedListsRef())
+  const batch = writeBatch(db)
+  savedSnap.docs.forEach(d => {
+    const itemNames = d.data().itemNames ?? []
+    const hasRef = itemNames.some(i => (typeof i === 'string' ? i : i.name) === oldName)
+    if (hasRef) {
+      batch.update(d.ref, {
+        itemNames: itemNames.map(i => {
+          if (typeof i === 'string') return i === oldName ? newName : i
+          return i.name === oldName ? { ...i, name: newName } : i
+        })
+      })
+    }
+  })
+  await batch.commit()
 }
 
 export async function addMasterItem(item) {

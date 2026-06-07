@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useCurrentList, useMasterItems } from '../hooks/useFirestore'
 import { removeItemFromList, updateListItem, completeShoppingList, addItemToList } from '../firebase/firestore'
 import { CATEGORIES } from '../data/seedData'
@@ -25,6 +25,7 @@ function ListItem({ item, onCheck, onRemove, onQty }) {
   function dismiss() {
     if (gone) return
     setGone(true)
+    setSwiping(false) // BUG #4 FIX: reset swiping state
     onRemove(item.id)
   }
 
@@ -136,12 +137,7 @@ export default function NakupScreen({ syncStatus, setSyncStatus }) {
     })
     .slice(0, 8)
 
-  async function handleCheck(id) {
-    setSyncStatus('syncing')
-    await removeItemFromList(id)
-    setSyncStatus('online')
-  }
-
+  // BUG #7 FIX: jedna funkcia namiesto dvoch identických
   async function handleRemove(id) {
     setSyncStatus('syncing')
     await removeItemFromList(id)
@@ -212,7 +208,7 @@ export default function NakupScreen({ syncStatus, setSyncStatus }) {
                 <ListItem
                   key={item.id}
                   item={item}
-                  onCheck={handleCheck}
+                  onCheck={handleRemove}
                   onRemove={handleRemove}
                   onQty={handleQty}
                 />

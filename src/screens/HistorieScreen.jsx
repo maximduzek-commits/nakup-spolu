@@ -1,4 +1,4 @@
-import { useHistory, useCurrentList } from '../hooks/useFirestore'
+import { useHistory } from '../hooks/useFirestore' // BUG #2 FIX: useCurrentList nepoužitý
 import { addItemToList } from '../firebase/firestore'
 import SyncBadge from '../components/SyncBadge'
 
@@ -21,7 +21,6 @@ function relativeLabel(ts) {
 
 export default function HistorieScreen({ syncStatus, setSyncStatus }) {
   const history = useHistory()
-  const { items: currentItems } = useCurrentList()
 
   async function handleReAdd(entry) {
     if (!confirm(`Přidat ${entry.items.length} položek z tohoto nákupu do aktuálního seznamu?`)) return

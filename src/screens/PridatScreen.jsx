@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useMasterItems, useCurrentList } from '../hooks/useFirestore'
 import { addItemToList, removeItemFromList, addMasterItem, updateListItem, deleteMasterItem, renameMasterItem } from '../firebase/firestore'
 import { CATEGORIES } from '../data/seedData'
@@ -39,8 +39,8 @@ function RenameOverlay({ item, onSave, onCancel }) {
   const [value, setValue] = useState(item.name)
   const inputRef = useRef(null)
 
-  // auto-focus
-  useState(() => { setTimeout(() => inputRef.current?.focus(), 50) })
+  // BUG #3 FIX: useEffect namiesto useState pre side-effect
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 50) }, [])
 
   return (
     <div className="rename-backdrop" onClick={onCancel}>
