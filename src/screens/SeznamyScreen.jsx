@@ -231,9 +231,15 @@ export default function SeznamyScreen({ syncStatus, setSyncStatus }) {
               )}
 
               <div className="zoznam-tags">
-                {(list.itemNames ?? []).slice(0, 6).map(name => (
-                  <span key={name} className="zoznam-tag">{name}</span>
-                ))}
+                {(list.itemNames ?? []).slice(0, 6).map((item, i) => {
+                  const label = typeof item === 'string' ? item : item.name
+                  const qty   = typeof item === 'string' ? null : (item.qty > 1 ? ` ×${item.qty}` : null)
+                  return (
+                    <span key={`${label}-${i}`} className="zoznam-tag">
+                      {label}{qty && <span style={{ opacity: .6, fontSize: 11 }}>{qty}</span>}
+                    </span>
+                  )
+                })}
                 {(list.itemNames?.length ?? 0) > 6 && (
                   <span className="zoznam-tag more">+{list.itemNames.length - 6} dalších</span>
                 )}

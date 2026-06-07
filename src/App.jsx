@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { seedMasterItems, createSavedList, subscribeSavedLists } from './firebase/firestore'
 import { SEED_ITEMS, SEED_SAVED_LISTS } from './data/seedData'
 import BottomNav from './components/BottomNav'
+import ErrorBoundary from './components/ErrorBoundary'
 import NakupScreen from './screens/NakupScreen'
 import PridatScreen from './screens/PridatScreen'
 import SeznamyScreen from './screens/SeznamyScreen'
@@ -28,10 +29,12 @@ export default function App() {
   return (
     <div className="app-shell">
       <div className="app-content">
-        {tab === 'nakup'    && <NakupScreen    {...screenProps} />}
-        {tab === 'pridat'   && <PridatScreen   {...screenProps} />}
-        {tab === 'seznamy'  && <SeznamyScreen  {...screenProps} />}
-        {tab === 'historie' && <HistorieScreen {...screenProps} />}
+        <ErrorBoundary key={tab}>
+          {tab === 'nakup'    && <NakupScreen    {...screenProps} />}
+          {tab === 'pridat'   && <PridatScreen   {...screenProps} />}
+          {tab === 'seznamy'  && <SeznamyScreen  {...screenProps} />}
+          {tab === 'historie' && <HistorieScreen {...screenProps} />}
+        </ErrorBoundary>
       </div>
       <BottomNav active={tab} onChange={setTab} />
     </div>
