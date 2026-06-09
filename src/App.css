@@ -2,6 +2,9 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Prevent iOS Safari from zooming on input focus (requires font-size >= 16px) */
+input, textarea, select { font-size: 16px; }
+
 :root {
   --cream:        #F8F5EF;
   --cream-dark:   #EDE9E0;

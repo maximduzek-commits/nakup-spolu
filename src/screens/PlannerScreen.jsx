@@ -2,18 +2,19 @@ import { useState, useEffect, useRef } from 'react'
 import { useMealPlan, useMasterItems } from '../hooks/useFirestore'
 import { saveMealSlot, addItemToList } from '../firebase/firestore'
 import { CATEGORIES } from '../data/seedData'
+import { normalize } from '../utils/normalize'
 import SyncBadge from '../components/SyncBadge'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const DAYS = [
-  { key: 'monday',    label: 'Pondělí',  short: 'Po' },
-  { key: 'tuesday',   label: 'Úterý',    short: 'Út' },
-  { key: 'wednesday', label: 'Středa',   short: 'St' },
-  { key: 'thursday',  label: 'Čtvrtek',  short: 'Čt' },
-  { key: 'friday',    label: 'Pátek',    short: 'Pá' },
-  { key: 'saturday',  label: 'Sobota',   short: 'So' },
-  { key: 'sunday',    label: 'Neděle',   short: 'Ne' },
+  { key: 'monday',    label: 'Pondělí' },
+  { key: 'tuesday',   label: 'Úterý' },
+  { key: 'wednesday', label: 'Středa' },
+  { key: 'thursday',  label: 'Čtvrtek' },
+  { key: 'friday',    label: 'Pátek' },
+  { key: 'saturday',  label: 'Sobota' },
+  { key: 'sunday',    label: 'Neděle' },
 ]
 
 const SLOTS = [
@@ -22,37 +23,15 @@ const SLOTS = [
   { key: 'dinner',    label: 'Večeře',  emoji: '🌙' },
 ]
 
-// Sunday=0 in JS → map to our day keys
-const JS_DAY_TO_KEY = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
+// Sunday=0 in JS → map to our keys
+const JS_DAY_KEYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday']
 
-// ── ISO week helpers ───────────────────────────────────────────────────────────
-
-function getISOWeekInfo(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  const week = Math.ceil(((d - yearStart) / 86400000 + 1) / 7)
-  return {
-    year: d.getUTCFullYear(),
-    week,
-    key: `${d.getUTCFullYear()}-W${String(week).padStart(2, '0')}`,
-  }
-}
-
-function addWeeks(date, delta) {
-  const d = new Date(date)
-  d.setDate(d.getDate() + delta * 7)
-  return d
-}
-
-function isCurrentWeek(baseDate) {
-  return getISOWeekInfo(baseDate).key === getISOWeekInfo(new Date()).key
-}
+// Fixed plan key — no weekly switching, single reusable template
+const PLAN_KEY = 'weekly-template'
 
 // ── MealSlotEditor (bottom sheet) ─────────────────────────────────────────────
 
-function MealSlotEditor({ dayKey, slot, mealData, weekKey, masterItems, onClose, setSyncStatus }) {
+function MealSlotEditor({ dayKey, slot, mealData, masterItems, onClose, setSyncStatus }) {
   const [mealName, setMealName]   = useState(mealData.name ?? '')
   const [selected, setSelected]   = useState(() => {
     const m = new Map()
@@ -65,11 +44,10 @@ function MealSlotEditor({ dayKey, slot, mealData, weekKey, masterItems, onClose,
 
   useEffect(() => { setTimeout(() => nameRef.current?.focus(), 50) }, [])
 
-  const dayLabel  = DAYS.find(d => d.key === dayKey)?.label ?? dayKey
-  const slotLabel = slot.label
+  const dayLabel = DAYS.find(d => d.key === dayKey)?.label ?? dayKey
 
   const filtered = search.trim()
-    ? masterItems.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    ? masterItems.filter(i => normalize(i.name).includes(normalize(search)))
     : masterItems
 
   const grouped = CATEGORIES.map(cat => ({
@@ -103,7 +81,7 @@ function MealSlotEditor({ dayKey, slot, mealData, weekKey, masterItems, onClose,
     try {
       setSyncStatus('syncing')
       const ingredients = [...selected.entries()].map(([name, { qty, category }]) => ({ name, qty, category }))
-      await saveMealSlot(weekKey, dayKey, slot.key, { name: mealName.trim(), ingredients })
+      await saveMealSlot(PLAN_KEY, dayKey, slot.key, { name: mealName.trim(), ingredients })
       setSyncStatus('online')
       onClose()
     } catch (e) {
@@ -136,7 +114,7 @@ function MealSlotEditor({ dayKey, slot, mealData, weekKey, masterItems, onClose,
         {/* Header */}
         <div className="meal-editor-header">
           <div className="meal-editor-title">
-            {slot.emoji} {slotLabel} · {dayLabel}
+            {slot.emoji} {slot.label} · {dayLabel}
           </div>
           <button className="meal-editor-close" onClick={onClose}>×</button>
         </div>
@@ -323,28 +301,13 @@ function DayCard({ day, meals, expanded, isToday, onToggle, onEditSlot }) {
 // ── PlannerScreen ─────────────────────────────────────────────────────────────
 
 export default function PlannerScreen({ syncStatus, setSyncStatus }) {
-  const [baseDate, setBaseDate]     = useState(() => new Date())
-  const [expandedDay, setExpandedDay] = useState(null)
-  const [editingSlot, setEditingSlot] = useState(null) // { dayKey, slot }
+  const [expandedDay, setExpandedDay]   = useState(null)
+  const [editingSlot, setEditingSlot]   = useState(null) // { dayKey, slot }
 
-  const weekInfo = getISOWeekInfo(baseDate)
-  const { plan } = useMealPlan(weekInfo.key)
+  const { plan } = useMealPlan(PLAN_KEY)
   const { items: masterItems } = useMasterItems()
 
-  const todayKey    = JS_DAY_TO_KEY[new Date().getDay()]
-  const onThisWeek  = isCurrentWeek(baseDate)
-
-  function handleToggleDay(dayKey) {
-    setExpandedDay(prev => prev === dayKey ? null : dayKey)
-  }
-
-  function handleEditSlot(dayKey, slot) {
-    setEditingSlot({ dayKey, slot })
-  }
-
-  function handleCloseEditor() {
-    setEditingSlot(null)
-  }
+  const todayKey = JS_DAY_KEYS[new Date().getDay()]
 
   const editingMealData = editingSlot
     ? (plan?.days?.[editingSlot.dayKey]?.[editingSlot.slot.key] ?? { name: '', ingredients: [] })
@@ -355,23 +318,7 @@ export default function PlannerScreen({ syncStatus, setSyncStatus }) {
       {/* Header */}
       <div className="app-header">
         <div className="header-row">
-          <div className="planner-week-nav">
-            <button className="planner-nav-btn" onClick={() => setBaseDate(d => addWeeks(d, -1))}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M15 18l-6-6 6-6"/>
-              </svg>
-            </button>
-            <div className="planner-week-label">
-              <span className="planner-week-title">Týden {weekInfo.week}</span>
-              <span className="planner-week-year">· {weekInfo.year}</span>
-              {onThisWeek && <span className="planner-this-week">tento týden</span>}
-            </div>
-            <button className="planner-nav-btn" onClick={() => setBaseDate(d => addWeeks(d, 1))}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M9 18l6-6-6-6"/>
-              </svg>
-            </button>
-          </div>
+          <div className="app-title">Plánovač 📅</div>
           <SyncBadge status={syncStatus} />
         </div>
       </div>
@@ -385,9 +332,9 @@ export default function PlannerScreen({ syncStatus, setSyncStatus }) {
               day={day}
               meals={plan?.days?.[day.key]}
               expanded={expandedDay === day.key}
-              isToday={onThisWeek && todayKey === day.key}
-              onToggle={() => handleToggleDay(day.key)}
-              onEditSlot={(slot) => handleEditSlot(day.key, slot)}
+              isToday={todayKey === day.key}
+              onToggle={() => setExpandedDay(prev => prev === day.key ? null : day.key)}
+              onEditSlot={(slot) => setEditingSlot({ dayKey: day.key, slot })}
             />
           ))}
         </div>
@@ -399,9 +346,8 @@ export default function PlannerScreen({ syncStatus, setSyncStatus }) {
           dayKey={editingSlot.dayKey}
           slot={editingSlot.slot}
           mealData={editingMealData}
-          weekKey={weekInfo.key}
           masterItems={masterItems}
-          onClose={handleCloseEditor}
+          onClose={() => setEditingSlot(null)}
           setSyncStatus={setSyncStatus}
         />
       )}

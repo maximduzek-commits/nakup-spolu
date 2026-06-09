@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSavedLists, useMasterItems } from '../hooks/useFirestore'
 import { addItemToList, deleteSavedList, createSavedList } from '../firebase/firestore'
 import { SEED_ITEMS, CATEGORIES } from '../data/seedData'
+import { normalize } from '../utils/normalize'
 import SyncBadge from '../components/SyncBadge'
 
 const EMOJIS = ['📝','🔥','☀️','🥗','🎉','🧺','👶','💊','🏠','🌿','🍕','🎯']
@@ -38,7 +39,7 @@ function CreatePanel({ masterItems, onSave, onCancel }) {
   }
 
   const filtered = search.trim()
-    ? masterItems.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    ? masterItems.filter(i => normalize(i.name).includes(normalize(search)))
     : masterItems
 
   const grouped = CATEGORIES.map(cat => ({

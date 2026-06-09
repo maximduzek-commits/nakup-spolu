@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useMasterItems, useCurrentList } from '../hooks/useFirestore'
 import { addItemToList, removeItemFromList, addMasterItem, updateListItem, deleteMasterItem, renameMasterItem } from '../firebase/firestore'
 import { CATEGORIES } from '../data/seedData'
+import { normalize } from '../utils/normalize'
 import SyncBadge from '../components/SyncBadge'
 
 const LONG_PRESS_MS = 550
@@ -218,7 +219,7 @@ export default function PridatScreen({ syncStatus, setSyncStatus }) {
   }
 
   const filtered = search.trim()
-    ? masterItems.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    ? masterItems.filter(i => normalize(i.name).includes(normalize(search)))
     : masterItems
 
   const grouped = CATEGORIES.map(cat => ({
@@ -226,7 +227,7 @@ export default function PridatScreen({ syncStatus, setSyncStatus }) {
     items: filtered.filter(i => i.category === cat.name),
   })).filter(g => g.items.length > 0)
 
-  const showAddCustom = search.trim() && !masterItems.find(i => i.name.toLowerCase() === search.toLowerCase())
+  const showAddCustom = search.trim() && !masterItems.find(i => normalize(i.name) === normalize(search))
 
   return (
     <div className="screen-wrap">
