@@ -154,6 +154,30 @@ export async function deleteSavedList(id) {
   await deleteDoc(doc(db, 'household', HOUSEHOLD_ID, 'savedLists', id))
 }
 
+// ── Meal plan ──
+const mealPlanRef = (weekKey) => doc(db, 'household', HOUSEHOLD_ID, 'mealPlan', weekKey)
+
+export function subscribeMealPlan(weekKey, cb) {
+  return onSnapshot(mealPlanRef(weekKey), snap => {
+    cb(snap.exists() ? snap.data() : null)
+  })
+}
+
+export async function saveMealSlot(weekKey, day, slot, mealData) {
+  const ref = mealPlanRef(weekKey)
+  try {
+    // updateDoc uses dot-notation → only touches the specific slot, leaves other days intact
+    await updateDoc(ref, {
+      [`days.${day}.${slot}`]: { name: mealData.name, ingredients: mealData.ingredients },
+    })
+  } catch {
+    // Document doesn't exist yet → create it
+    await setDoc(ref, {
+      days: { [day]: { [slot]: { name: mealData.name, ingredients: mealData.ingredients } } },
+    })
+  }
+}
+
 // ── Seed master items (adds missing items, safe to run repeatedly) ──
 export async function seedMasterItems(items) {
   try {

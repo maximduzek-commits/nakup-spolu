@@ -5,6 +5,7 @@ import BottomNav from './components/BottomNav'
 import ErrorBoundary from './components/ErrorBoundary'
 import NakupScreen from './screens/NakupScreen'
 import PridatScreen from './screens/PridatScreen'
+import PlannerScreen from './screens/PlannerScreen'
 import SeznamyScreen from './screens/SeznamyScreen'
 import HistorieScreen from './screens/HistorieScreen'
 import './App.css'
@@ -32,6 +33,7 @@ export default function App() {
         <ErrorBoundary key={tab}>
           {tab === 'nakup'    && <NakupScreen    {...screenProps} />}
           {tab === 'pridat'   && <PridatScreen   {...screenProps} />}
+          {tab === 'planner'  && <PlannerScreen  {...screenProps} />}
           {tab === 'seznamy'  && <SeznamyScreen  {...screenProps} />}
           {tab === 'historie' && <HistorieScreen {...screenProps} />}
         </ErrorBoundary>

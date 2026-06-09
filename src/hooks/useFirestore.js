@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   subscribeCurrentList, subscribeMasterItems,
-  subscribeHistory, subscribeSavedLists,
+  subscribeHistory, subscribeSavedLists, subscribeMealPlan,
 } from '../firebase/firestore'
 
 export function useCurrentList() {
@@ -40,4 +40,13 @@ export function useSavedLists() {
     return unsub
   }, [])
   return lists
+}
+
+export function useMealPlan(weekKey) {
+  const [plan, setPlan] = useState(null)
+  useEffect(() => {
+    const unsub = subscribeMealPlan(weekKey, setPlan)
+    return unsub
+  }, [weekKey])
+  return { plan }
 }
