@@ -372,7 +372,7 @@ html, body, #root {
 .search-input-wrap input {
   border: none; background: none; outline: none;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 15px; font-weight: 500; color: var(--text); width: 100%;
+  font-size: 16px; font-weight: 500; color: var(--text); width: 100%;
 }
 .search-input-wrap input::placeholder { color: var(--text-muted); font-weight: 400; }
 
@@ -944,7 +944,7 @@ html, body, #root {
   border: 1.5px solid var(--border);
   border-radius: var(--r-md);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 15px; color: var(--text);
+  font-size: 16px; color: var(--text);
   background: var(--cream);
   outline: none; transition: border-color .15s;
 }
@@ -1220,7 +1220,7 @@ html, body, #root {
   border: 1.5px solid var(--border);
   border-radius: var(--r-sm);
   font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--text);
   background: var(--cream);
