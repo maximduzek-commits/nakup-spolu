@@ -154,13 +154,15 @@ export async function deleteSavedList(id) {
   await deleteDoc(doc(db, 'household', HOUSEHOLD_ID, 'savedLists', id))
 }
 
-// ── Seed master items (run once) ──
+// ── Seed master items (adds missing items, safe to run repeatedly) ──
 export async function seedMasterItems(items) {
   try {
     const existing = await getDocs(masterItemsRef())
-    if (existing.size > 0) return
+    const existingNames = new Set(existing.docs.map(d => d.data().name))
+    const missing = items.filter(item => !existingNames.has(item.name))
+    if (missing.length === 0) return
     const batch = writeBatch(db)
-    items.forEach(item => {
+    missing.forEach(item => {
       const ref = doc(masterItemsRef())
       batch.set(ref, { ...item, purchaseCount: 0, lastPurchased: null, createdAt: serverTimestamp() })
     })
