@@ -228,7 +228,16 @@ html, body, #root {
   transition: background .15s, transform .1s;
 }
 .list-item:active { transform: scale(.985); background: var(--green-pale); }
-.list-item.removing { pointer-events: none; }
+.list-item.removing {
+  pointer-events: none;
+  animation: itemFlash .45s ease;
+}
+
+@keyframes itemFlash {
+  0%   { background: var(--white); }
+  25%  { background: var(--green-pale); }
+  100% { background: var(--white); }
+}
 
 .checkbox {
   width: 24px; height: 24px;
@@ -244,6 +253,22 @@ html, body, #root {
 .checkbox.checked {
   background: var(--green);
   border-color: var(--green);
+  animation: checkboxPop .4s cubic-bezier(.34,1.56,.64,1);
+}
+
+@keyframes checkboxPop {
+  0%   { transform: scale(.55); }
+  60%  { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.checkbox.checked svg {
+  animation: checkmarkPop .3s cubic-bezier(.34,1.56,.64,1) .08s both;
+}
+
+@keyframes checkmarkPop {
+  0%   { transform: scale(0); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 .item-name {

@@ -62,6 +62,7 @@ function ListItem({ item, onCheck, onRemove, onQty }) {
   function handleClick() {
     if (swiping || gone) return
     setGone(true)
+    if (navigator.vibrate) navigator.vibrate(15)
     onCheck(item.id)
   }
 
